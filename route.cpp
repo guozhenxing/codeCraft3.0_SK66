@@ -7,17 +7,36 @@
 #include <vector>
 
 //--------------------------------------------------------------------------------------------------------类型定义
-typedef std::pair<int, int> Edge;               // 有向边的定义, first代表边的起点， second代表边的终点
-typedef std::pair<int, int> EdgeInfo;           // 有向边的附加信息的定义, first代表边的编号， second代表边的权重
-typedef std::map<int, std::set<int> > Graph;    // 图的定义
-typedef std::map<Edge, EdgeInfo> EdgeInfoDict;  // 有向边附加信息字典的定义
-typedef std::set<int> Conditions;               // 必须经过的结点集合
-typedef std::pair<int, std::vector<int> > Path; // 路径的定义， 由<权重， 经过的边的有序集合>构成
-typedef std::map<std::pair<int, int>, Path> ShortestPathDict;   // 最短路径字典， <<起点， 终点>， 路径>
+typedef std::pair<int, int>             Edge;           // 有向边的定义, first代表边的起点， second代表边的终点
+typedef std::pair<int, int>             EdgeInfo;       // 有向边的附加信息的定义, first代表边的编号， second代表边的权重
+typedef std::map<int, std::set<int> >   Graph;          // 图的定义
+typedef std::map<Edge, EdgeInfo>        EdgeInfoDict;   // 有向边附加信息字典的定义
+typedef std::set<int>                   Conditions;     // 必须经过的结点集合
+typedef std::pair<
+            int,
+            std::pair<
+                std::vector<int>,
+                std::vector<int>
+            >
+        >                               Path;           // 路径的定义， 由<权重， <经过的结点的集合，经过的边的有序集合>>构成, 经过的结点集合不包括最后一点， 即终点的结点编号
+typedef std::map<
+        std::pair<int, int>,
+        Path
+        >                               ShortestPathDict;   // 最短路径字典， <<起点， 终点>， 路径>
+typedef ShortestPathDict                SK66_D_dict;        // SK66算法中D(v_i, v_j)的定义
+typedef std::map<
+            std::pair<
+                std::pair<int, int>,    // 起始点， 终止点
+                int                     // 迭代次数
+            >,
+            Path                        // 路径
+        >                               SK66_F_dict;;       // SK66算法中f?(v_i, v_j)的定义
+
 typedef struct Candidate {                      // Dijstra算法中的候选人
     int nodeNo;
     int pathCost;
-    std::vector<int> path;
+    std::vector<int> nodePath;
+    std::vector<int> edgePath;
 
     bool operator <(const Candidate & other) const {
         // （1）： 结点编号一样， 无论权重大小， 都返回false
@@ -34,6 +53,7 @@ typedef struct Candidate {                      // Dijstra算法中的候选人
         }
     }
 } Candidate;
+
 //--------------------------------------------------------------------------------------------------------数据输入模块函数
 int ReadANumberFromStr(char *, int &);                          // 从字符流中读取一个数字
 void ReadGraphData(char **, Graph &, EdgeInfoDict &);           // 读取图信息
@@ -44,6 +64,17 @@ void PrintConditions(int , int , const Conditions & );  //向控制台输出约�
 void PrintShortestPathDict(const ShortestPathDict & );  //向控制台输出最短路径字典中的信息
 //--------------------------------------------------------------------------------------------------------算法函数
 void Dijkstra(const Graph &, const EdgeInfoDict &, int, ShortestPathDict &, const std::set<int> & = std::set<int>());    //Dijkstra单源最短路径算法
+void SK66(
+        int node,
+        int source,
+        int dest,
+        int iterCount,
+        const Graph & graph,
+        const EdgeInfoDict & edgeInfoDict,
+        const Conditions & conditions,
+        SK66_D_dict & ddict,
+        SK66_F_dict & fdict,
+        ShortestPathDict & pathDict);
 //--------------------------------------------------------------------------------------------------------赛题入口
 void search_route(char *graphStream[5000], int edge_num, char *conditionsStream)
 {
@@ -53,7 +84,8 @@ void search_route(char *graphStream[5000], int edge_num, char *conditionsStream)
     int dest;
     Conditions conditions;
     ShortestPathDict pathDict;
-
+    SK66_D_dict ddict;
+    SK66_F_dict fdict;
 
     ReadGraphData(graphStream, graph, edgeInfoDict);
     ReadConditionsData(conditionsStream, source, dest, conditions);
@@ -61,11 +93,29 @@ void search_route(char *graphStream[5000], int edge_num, char *conditionsStream)
     std::set<int> without;
     without.insert(1);
     without.insert(2);
-    Dijkstra(graph, edgeInfoDict, 1, pathDict);
 
-    PrintGraph(graph, edgeInfoDict);
-    PrintConditions(source, dest, conditions);
-    PrintShortestPathDict(pathDict);
+
+
+    SK66(source, source, dest, conditions.size(), graph, edgeInfoDict, conditions, ddict, fdict, pathDict);
+
+    std::pair<std::pair<int, int>, int> key;
+    key.first.first = source;
+    key.first.second = dest;
+    key.second = conditions.size();
+    Path ansPath = fdict[key];
+    int ansCost = ansPath.first;
+    std::vector<int> & pointPath = ansPath.second.first;
+    std::vector<int> & edgePath = ansPath.second.second;
+
+    printf("路径花费 == %d\n", ansCost);
+    printf("共经过了「%d」个结点： ",pointPath.size());
+    for(std::vector<int>::const_iterator iter = pointPath.begin(); iter != pointPath.end(); ++iter)
+        printf("%d|", (*iter));
+    printf("\n");
+    printf("共经过了「%d」条边: ", edgePath.size());
+    for(std::vector<int>::const_iterator iter = edgePath.begin(); iter != edgePath.end(); ++iter)
+        printf("%d|", (*iter));
+    printf("\n");
 }
 //--------------------------------------------------------------------------------------------------------数据输入模块函数实现
 int ReadANumberFromStr(char * str, int & index) {
@@ -160,11 +210,24 @@ void PrintShortestPathDict(const ShortestPathDict & pathDict) {
         int from = (iter->first).first;
         int to = (iter->first).second;
         int cost = (iter->second).first;
-        const std::vector<int> & path = (iter->second).second;
+        const std::pair<std::vector<int>, std::vector<int> > & path = (iter->second).second;
+        const std::vector<int> & pathOfEdge = path.second;
+        const std::vector<int> & pathOfPoint = path.first;
         printf("-------最短路径： 「%d」 --> 「%d」， 路径权重「%d」-------\n", from, to, cost);
-        for(std::vector<int>::const_iterator veciter = path.begin(); veciter != path.end(); ++veciter)
-            printf("%d ", *veciter);
+        printf("\t经过的边集合:\t");
+        bool firstBlood = false;
+        for(std::vector<int>::const_iterator veciter = pathOfEdge.begin(); veciter != pathOfEdge.end(); ++veciter) {
+            if(firstBlood){
+                printf("->");
+            }
+            printf("%d", *veciter);
+            firstBlood = true;
+        }
         printf("\n");
+        printf("\t经过的结点集合：\t");
+        for(std::vector<int>::const_iterator veciter = pathOfPoint.begin(); veciter != pathOfPoint.end(); ++veciter)
+            printf("%d->", *veciter);
+        printf("%d\n", to);
     }
     printf("-------共有%d条最短路径信息-------\n", pathDict.size());
 }
@@ -190,7 +253,8 @@ void Dijkstra(const Graph & graph, const EdgeInfoDict & edgeInfoDict,int source,
                 Candidate candidate;
                 candidate.nodeNo = *iter;
                 const EdgeInfo & edgeInfo = pEdgeInfo->second;
-                candidate.path.push_back(edgeInfo.first);
+                candidate.edgePath.push_back(edgeInfo.first);
+                candidate.nodePath.push_back(source);
                 candidate.pathCost = edgeInfo.second;
                 candidates.insert(candidate);
             }
@@ -205,7 +269,11 @@ void Dijkstra(const Graph & graph, const EdgeInfoDict & edgeInfoDict,int source,
         Candidate bestCandidate = *(candidates.begin());
         candidates.erase(bestCandidate);
         processed.insert(bestCandidate.nodeNo);
-        pathDict[std::pair<int, int>(source, bestCandidate.nodeNo)] = Path(bestCandidate.pathCost, bestCandidate.path);
+        Path path;
+        path.first = bestCandidate.pathCost;
+        path.second.first = bestCandidate.nodePath;
+        path.second.second = bestCandidate.edgePath;
+        pathDict[std::pair<int, int>(source, bestCandidate.nodeNo)] = path;
 
         // 访问最佳候选人的所有邻接点， 以刷新或扩充候选结点
         Graph::const_iterator PBestCandidateAdjs = graph.find(bestCandidate.nodeNo);
@@ -221,12 +289,14 @@ void Dijkstra(const Graph & graph, const EdgeInfoDict & edgeInfoDict,int source,
 
             Candidate candidate;
             candidate.nodeNo = adjNode;
-            candidate.path = bestCandidate.path;
+            candidate.edgePath = bestCandidate.edgePath;
+            candidate.nodePath = bestCandidate.nodePath;
             candidate.pathCost = bestCandidate.pathCost;
             EdgeInfoDict::const_iterator PBestCanToCanInfo = edgeInfoDict.find(Edge(bestCandidate.nodeNo, candidate.nodeNo));
             if(PBestCanToCanInfo != edgeInfoDict.end()) {
                 const EdgeInfo & edgeBestCanToCanInfo = PBestCanToCanInfo->second;
-                candidate.path.push_back(edgeBestCanToCanInfo.first);
+                candidate.edgePath.push_back(edgeBestCanToCanInfo.first);
+                candidate.nodePath.push_back(bestCandidate.nodeNo);
                 candidate.pathCost += edgeBestCanToCanInfo.second;
             }
 
@@ -238,5 +308,103 @@ void Dijkstra(const Graph & graph, const EdgeInfoDict & edgeInfoDict,int source,
                 candidates.insert(candidate);
             }
         }
+    }
+}
+
+void SK66(
+        int node,
+        int source,
+        int dest,
+        int iterCount,
+        const Graph & graph,
+        const EdgeInfoDict & edgeInfoDict,
+        const Conditions & conditions,
+        SK66_D_dict & ddict,
+        SK66_F_dict & fdict,
+        ShortestPathDict & pathDict) {
+    // 当迭代次数为0时， 直接计算node->dest单源最短路径，存入结果字典里
+    if(iterCount == 0) {
+        std::pair<int, int> pathToBeSolve(node, dest);
+        if(!pathDict.count(pathToBeSolve))
+            Dijkstra(graph, edgeInfoDict, node, pathDict);
+        if(!pathDict.count(pathToBeSolve)) {
+            std::pair<std::pair<int, int>, int> key;
+            key.first = pathToBeSolve;
+            key.second = 0;
+            Path path;
+            path.first = 0xffffff;          // 六个f， 足够表示无穷大了, 防止在后续加法中溢出
+            fdict[key] = path;
+        } else {
+            std::pair<std::pair<int, int>, int> key;
+            key.first = pathToBeSolve;
+            key.second = 0;
+            ShortestPathDict::const_iterator PPath = pathDict.find(pathToBeSolve);
+            Path path = PPath->second;
+            fdict[key] = path;
+        }
+    } else {
+        // 当迭代次数大于0的时候
+        std::pair<std::pair<int, int>, int> key;
+        key.first = std::pair<int, int>(node, dest);
+        key.second = iterCount;
+
+        Path minCostPath;
+        minCostPath.first = 0x7fffffff;
+
+        for(Conditions::const_iterator iter = conditions.begin(); iter != conditions.end(); ++iter) {
+            if(*iter == node)
+                continue;
+
+            // 计算D(v_i, v_l)
+            std::pair<int, int> leftHalfPathToBeSolve(node, *iter);
+            if(!pathDict.count(leftHalfPathToBeSolve)) {
+                Dijkstra(graph, edgeInfoDict, node, pathDict);
+            }
+            if(!pathDict.count(leftHalfPathToBeSolve)) {
+                Path leftHalfPath;
+                leftHalfPath.first = 0xffffff;
+                ddict[leftHalfPathToBeSolve] = leftHalfPath;
+            } else {
+                ShortestPathDict::const_iterator PPath = pathDict.find(leftHalfPathToBeSolve);
+                Path leftHalfPath = PPath->second;
+                ddict[leftHalfPathToBeSolve] = leftHalfPath;
+            }
+            // 计算F(v_l, t)
+
+
+
+
+
+            // 筛选出最小值
+            std::pair<std::pair<int, int>, int> rightHalfPathToBeSolve;
+            rightHalfPathToBeSolve.first.first = *iter;
+            rightHalfPathToBeSolve.first.second = dest;
+            rightHalfPathToBeSolve.second = iterCount-1;
+            if(!fdict.count(rightHalfPathToBeSolve)) {
+                SK66(*iter, source, dest, iterCount-1, graph, edgeInfoDict, conditions, ddict, fdict, pathDict);
+            }
+            if(ddict[leftHalfPathToBeSolve].first + fdict[rightHalfPathToBeSolve].first < minCostPath.first) {
+                minCostPath.first = ddict[leftHalfPathToBeSolve].first + fdict[rightHalfPathToBeSolve].first;
+                minCostPath.second.first.clear();
+                minCostPath.second.second.clear();
+                minCostPath.second.first.insert(minCostPath.second.first.end(),
+                        ddict[leftHalfPathToBeSolve].second.first.begin(),
+                        ddict[leftHalfPathToBeSolve].second.first.end());
+                minCostPath.second.first.insert(minCostPath.second.first.end(),
+                        fdict[rightHalfPathToBeSolve].second.first.begin(),
+                        fdict[rightHalfPathToBeSolve].second.first.end());
+                minCostPath.second.second.insert(
+                        minCostPath.second.second.end(),
+                        ddict[leftHalfPathToBeSolve].second.second.begin(),
+                        ddict[leftHalfPathToBeSolve].second.second.end());
+                minCostPath.second.second.insert(
+                        minCostPath.second.second.end(),
+                        fdict[rightHalfPathToBeSolve].second.second.begin(),
+                        fdict[rightHalfPathToBeSolve].second.second.end());
+            }
+
+        }
+
+        fdict[key] = minCostPath;
     }
 }
