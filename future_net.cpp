@@ -18,9 +18,8 @@ int main(int argc, char *argv[])
     if (edge_num == 0)
     {
         printf("Please input valid topo file.\n");
+        
         return -1;
-        
-        
         
         
     }
