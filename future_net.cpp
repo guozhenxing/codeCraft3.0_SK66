@@ -19,6 +19,10 @@ int main(int argc, char *argv[])
     {
         printf("Please input valid topo file.\n");
         return -1;
+        
+        
+        
+        
     }
     char *demand_file = argv[2];
     demand_num = read_file(&demand, 1, demand_file);
