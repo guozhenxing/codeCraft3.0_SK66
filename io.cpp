@@ -20,6 +20,7 @@ typedef struct
     int head;
     int tail;
     int cnt;
+
 }RECORD_QUEUE_S;
 
 static char g_result[MAX_LINE_LEN] = "NA";
