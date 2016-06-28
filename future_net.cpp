@@ -7,6 +7,8 @@ int main(int argc, char *argv[])
 {
     print_time("Begin");
     char *topo[5000];
+    
+    
     int edge_num;
     char *demand;
     int demand_num;
