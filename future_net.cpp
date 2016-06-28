@@ -9,8 +9,9 @@ int main(int argc, char *argv[])
     char *topo[5000];
     
     
-    int edge_num;
+
     char *demand;
+        int edge_num;
     int demand_num;
 
     char *topo_file = argv[1];
