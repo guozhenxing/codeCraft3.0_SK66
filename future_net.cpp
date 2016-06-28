@@ -36,6 +36,9 @@ int main(int argc, char *argv[])
     char *result_file = argv[3];
     write_result(result_file);
     release_buff(topo, edge_num);
+    
+    
+    
     release_buff(&demand, 1);
 
     print_time("End");
