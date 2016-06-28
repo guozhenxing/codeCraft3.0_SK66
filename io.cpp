@@ -19,6 +19,7 @@ typedef struct
     char *record[MAX_RECORD];
     int head;
     int tail;
+
     int cnt;
 
 }RECORD_QUEUE_S;
